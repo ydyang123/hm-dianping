@@ -1,0 +1,135 @@
+package com.hmdp.controller;
+
+
+import cn.hutool.core.util.RandomUtil;
+import com.hmdp.dto.LoginFormDTO;
+import com.hmdp.dto.Result;
+import com.hmdp.dto.UserDTO;
+import com.hmdp.entity.User;
+import com.hmdp.entity.UserInfo;
+import com.hmdp.service.IUserInfoService;
+import com.hmdp.service.IUserService;
+import com.hmdp.utils.RegexUtils;
+import com.hmdp.utils.UserHolder;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
+import org.springframework.web.bind.annotation.*;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
+
+/**
+ * <p>
+ * 前端控制器
+ * </p>
+ *
+ * @author 虎哥
+ * @since 2021-12-22
+ */
+@Slf4j
+@RestController
+@RequestMapping("/user")
+public class UserController {
+
+    @Resource
+    private IUserService userService;
+    @Resource
+    private IUserInfoService userInfoService;
+
+    /**
+     * 发送手机验证码
+     */
+    @PostMapping("code")
+    public Result sendCode(@RequestParam("phone") String phone, HttpSession session) {
+        //发送短信验证码并保存验证码
+        return userService.sendCode(phone,session);
+
+    }
+
+    /**
+     * 登录功能
+     * @param loginForm 登录参数，包含手机号、验证码；或者手机号、密码
+     */
+    @PostMapping("/login")
+    public Result login(@RequestBody LoginFormDTO loginForm, HttpSession session){
+        //  实现登录功能
+        return userService.login(loginForm, session);
+    }
+
+    /**
+     * 登出功能
+     * @return 无
+     */
+    @PostMapping("/logout")
+    public Result logout(HttpServletRequest request){
+        //实现登出功能
+        String token = request.getHeader("authorization");
+        userService.logout(token);
+        return Result.ok();
+    }
+
+    @GetMapping("/me")
+    public Result me(){
+        // 获取当前登录的用户并返回
+        UserDTO user = UserHolder.getUser();
+        return Result.ok(user);
+    }
+    @GetMapping("/{id}")
+    public Result queryUserById(@PathVariable("id") Long id) {
+        // 直接调用 userService 查询 tb_user 表
+        User user = userService.getById(id);
+        if (user == null) {
+            return Result.fail("用户不存在");
+        }
+        // 为了安全起见，建议将 User 转换为 UserDTO 返回，隐藏手机号、密码等敏感信息
+        UserDTO userDTO = new UserDTO();
+        BeanUtils.copyProperties(user, userDTO);
+        return Result.ok(userDTO);
+    }
+
+    @GetMapping("/info/{id}")
+    public Result info(@PathVariable("id") Long id){
+        // 查询详情
+        UserInfo info = userInfoService.getById(id);
+        if (info == null) {
+            // 没有详情，应该是第一次查看详情
+            return Result.ok();
+        }
+        info.setCreateTime(null);
+        info.setUpdateTime(null);
+        // 返回
+        return Result.ok(info);
+    }
+    /*
+     * 签到功能
+     */
+    @PostMapping("/sign")
+    public Result sign(){
+        return userService.sign();
+    }
+
+    /**
+     * 签到状态
+     */
+    @GetMapping("/sign/status")
+    public Result signStatus(){
+        return userService.signStatus();
+    }
+
+    /**
+     * 年度签到日历
+     */
+    @GetMapping("/sign/calendar")
+    public Result signCalendar(@RequestParam(value = "year", required = false) Integer year){
+        return userService.signCalendar(year);
+    }
+
+    /**
+     * 签到统计
+     */
+    @GetMapping("/sign/count")
+    public Result signCount(){
+        return userService.signCount();
+    }
+}
